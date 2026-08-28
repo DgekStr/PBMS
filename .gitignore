@@ -25,3 +25,4 @@ __pycache__/
 
 # Keep the repository's documentation page; ignore only generated reports.
 !readme.html
+!readme-small.html
