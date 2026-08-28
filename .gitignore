@@ -1,0 +1,27 @@
+# Local configuration and runtime artifacts
+backup_monitor.conf
+*.local
+.env
+.env.*
+
+# SMTP credentials
+.msmtprc
+msmtprc
+
+# Generated reports, data and logs
+*.json
+*.html
+*.log
+/tmp/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Keep the repository's documentation page; ignore only generated reports.
+!readme.html

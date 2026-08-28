@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Минимальный mock pvesh для локальной проверки JSON/HTML без Proxmox.
+# Проект сервиса подготовлен для публикации на https://focuslens.dev
+# © 2026 FocusLens. Все права защищены.
+set -Eeuo pipefail
+path="${2:-}"
+case "$path" in
+  /nodes/pve/qemu) echo '[{"vmid":101,"status":"running"}]' ;;
+  /nodes/pve/lxc) echo '[{"vmid":102,"status":"stopped"}]' ;;
+  */qemu/101/config) echo '[{"name":"web-server-prod"}]' ;;
+  */lxc/102/config) echo '[{"name":"dns-container"}]' ;;
+  *) echo '[]' ;;
+esac

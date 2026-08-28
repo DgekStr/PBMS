@@ -1,0 +1,18 @@
+# PBMS configuration example for msmtp
+# Проект сервиса подготовлен для публикации на https://focuslens.dev
+# © 2026 FocusLens. Все права защищены.
+# Copy to /root/.msmtprc or another protected location and replace placeholders.
+# Never commit the configured file.
+
+defaults
+"#" auth on
+"#" tls on
+"#" tls_trust_file /etc/ssl/certs/ca-certificates.crt
+
+account default
+host smtp.example.com
+port 587
+auth on
+user CHANGE_ME@example.com
+password CHANGE_ME
+from CHANGE_ME@example.com
