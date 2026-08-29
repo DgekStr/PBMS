@@ -8,3 +8,8 @@ PBMS_PVESH_TIMEOUT="15"
 PBMS_MAX_RUNTIME="30"
 PBMS_DEBUG_FILE="/var/log/backup_monitor_debug.log"
 PBMS_HOSTNAME="Proxmox cluster"
+
+# Mattermost Incoming Webhook. Store the real URL only in /etc/backup_monitor.conf.
+PBMS_MATTERMOST_ENABLED="true"
+PBMS_MATTERMOST_WEBHOOK_URL="CHANGE_ME"
+PBMS_MATTERMOST_ONLY_ON_ERROR="false"

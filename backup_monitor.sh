@@ -13,6 +13,9 @@ CONFIG_FILE="${PBMS_CONFIG:-/etc/backup_monitor.conf}"
 : "${PBMS_HOSTNAME:=Proxmox cluster}"
 : "${PBMS_SMTP_BIN:=msmtp}"
 : "${PBMS_PVESH_TIMEOUT:=15}"
+: "${PBMS_MATTERMOST_ENABLED:=false}"
+: "${PBMS_MATTERMOST_WEBHOOK_URL:=CHANGE_ME}"
+: "${PBMS_MATTERMOST_ONLY_ON_ERROR:=false}"
 
 DATA_FILE="${PBMS_DATA_FILE:-/tmp/backup_data.json}"
 REPORT_FILE="${PBMS_REPORT_FILE:-/tmp/backup_report.html}"
@@ -41,6 +44,13 @@ encode_rfc2047(){
   printf 'Content-Transfer-Encoding: 8bit\n\n'
   cat "$REPORT_FILE"
 } | "$PBMS_SMTP_BIN" -t
+
+# Отправка краткого уведомления в Mattermost. Webhook не попадает в отчёт или Git.
+if [[ "$PBMS_MATTERMOST_ENABLED" == "true" ]]; then
+  if [[ "$PBMS_MATTERMOST_ONLY_ON_ERROR" != "true" || $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(bool(d.get("errors") or any(not x.get("backup") or x["backup"].get("status") == "ERROR" for x in d.get("objects", [])))' "$DATA_FILE") == "True" ]]; then
+    /usr/local/bin/backup_monitor_mattermost.py "$DATA_FILE" "$PBMS_MATTERMOST_WEBHOOK_URL" "$PBMS_HOSTNAME" || echo "⚠️ Mattermost notification failed" >&2
+  fi
+fi
 
 echo "✅ Отчет отправлен на $PBMS_RECIPIENT"
 echo "📋 Тема: $subject"

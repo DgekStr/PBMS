@@ -26,9 +26,10 @@
 
 | Файл | Назначение |
 |---|---|
-| [`backup_monitor.sh`](backup_monitor.sh) | Оркестрация сбора, генерации отчёта и отправки письма |
+| [`backup_monitor.sh`](backup_monitor.sh) | Оркестрация сбора, генерации отчёта, отправки письма и Mattermost-уведомления |
 | [`backup_monitor_collector.py`](backup_monitor_collector.py) | Сбор данных через `pvesh` и поиск backup-файлов |
 | [`backup_monitor_html.py`](backup_monitor_html.py) | Генерация HTML |
+| [`backup_monitor_mattermost.py`](backup_monitor_mattermost.py) | Отправка краткого статуса в Mattermost через Incoming Webhook |
 | [`backup_monitor.conf.example`](backup_monitor.conf.example) | Публичный шаблон конфигурации PBMS |
 | [`msmtprc.example`](msmtprc.example) | Публичный шаблон конфигурации SMTP без учётных данных |
 | [`backup_monitor.cron`](backup_monitor.cron) | Ежедневный запуск в 08:00 |
@@ -43,6 +44,7 @@
 - Python 3;
 - `pvesh` и права `root`;
 - `msmtp` либо совместимая команда, принимающая сообщение через `-t`;
+- `curl` не требуется: Mattermost отправляется стандартной библиотекой Python;
 - доступ к каталогу хранения backup-файлов.
 
 Для установки зависимостей на Debian/Proxmox:
@@ -76,7 +78,10 @@ chmod +x install.sh backup_monitor.sh
 - `PBMS_PVESH_TIMEOUT` — таймаут одного запроса `pvesh` в секундах;
 - `PBMS_MAX_RUNTIME` — зарезервированная настройка общего лимита запуска;
 - `PBMS_DEBUG_FILE` — путь диагностического лога;
-- `PBMS_HOSTNAME` — подпись кластера в отчёте.
+- `PBMS_HOSTNAME` — подпись кластера в отчёте;
+- `PBMS_MATTERMOST_ENABLED` — включение уведомлений Mattermost (`true`/`false`);
+- `PBMS_MATTERMOST_WEBHOOK_URL` — Incoming Webhook URL, хранить только в локальном конфиге;
+- `PBMS_MATTERMOST_ONLY_ON_ERROR` — отправлять уведомление только при проблемах (`true`/`false`).
 
 По умолчанию коллектор ищет backup-файлы в следующих хранилищах:
 
@@ -87,6 +92,16 @@ chmod +x install.sh backup_monitor.sh
 Пути заданы в [`backup_monitor_collector.py`](backup_monitor_collector.py) и должны быть изменены под фактическую схему хранилищ кластера до установки.
 
 SMTP-профиль создаётся отдельно на сервере. Используйте [`msmtprc.example`](msmtprc.example) как основу, затем сохраните рабочий файл с правами `600`, например `/root/.msmtprc`. Рабочие адреса, логины и пароли не должны попадать в репозиторий.
+
+Для отправки уведомлений в Mattermost добавьте настоящий webhook только в `/etc/backup_monitor.conf`, например:
+
+```bash
+PBMS_MATTERMOST_ENABLED="true"
+PBMS_MATTERMOST_WEBHOOK_URL="https://chat.example/hooks/REPLACE_ME"
+PBMS_MATTERMOST_ONLY_ON_ERROR="false"
+```
+
+Webhook является секретом: не вставляйте его в README, example-файлы, issue или командную строку. Если URL уже был опубликован, после тестирования отзовите его в Mattermost и создайте новый.
 
 ## Логика проверки
 
@@ -111,7 +126,7 @@ cat /tmp/backup_report.html
 bash tests/test_mock.sh
 ```
 
-Тест проверяет генерацию HTML и наличие данных mock-объектов. Отправка почты в тестовом окружении намеренно может завершиться ошибкой, поскольку MTA не требуется для проверки сбора и генерации.
+Тест проверяет генерацию HTML и наличие данных mock-объектов. Отправка почты в тестовом окружении намеренно может завершиться ошибкой, поскольку MTA не требуется для проверки сбора и генерации. Уведомления Mattermost в mock-тесте не отправляются.
 
 ## Безопасность перед публикацией
 
