@@ -53,18 +53,35 @@
 apt install python3 msmtp
 ```
 
-## Установка
+## Установка через Git
+
+На чистой ноде Proxmox установите Git, клонируйте репозиторий и запустите установщик от имени `root`:
 
 ```bash
-cd /path/to/PBMS
-cp backup_monitor.conf.example /etc/backup_monitor.conf
-chmod 600 /etc/backup_monitor.conf
-editor /etc/backup_monitor.conf
-chmod +x install.sh backup_monitor.sh
-./install.sh
+apt update
+apt install -y git python3 msmtp
+sudo git clone https://github.com/DgekStr/PBMS.git /opt/PBMS
+cd /opt/PBMS
+sudo ./install.sh
 ```
 
-`install.sh` устанавливает основной скрипт в `/usr/local/bin`, cron-файл в `/etc/cron.d`, а конфигурацию копирует только если `/etc/backup_monitor.conf` ещё не существует.
+Затем заполните конфигурацию:
+
+```bash
+sudo editor /etc/backup_monitor.conf
+sudo chmod 600 /etc/backup_monitor.conf
+sudo /usr/local/bin/backup_monitor.sh
+```
+
+Для обновления существующей установки:
+
+```bash
+cd /opt/PBMS
+sudo git pull --ff-only origin main
+sudo ./install.sh
+```
+
+`install.sh` устанавливает скрипты в `/usr/local/bin`, cron-файл в `/etc/cron.d/backup_monitor`, а конфигурацию копирует только если `/etc/backup_monitor.conf` ещё не существует. Рабочая конфигурация при обновлении не перезаписывается.
 
 ## Настройка PBMS
 
