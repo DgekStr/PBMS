@@ -68,7 +68,7 @@ sudo ./install.sh
 Затем заполните конфигурацию:
 
 ```bash
-sudo editor /etc/backup_monitor.conf
+sudo nano /etc/backup_monitor.conf
 sudo chmod 600 /etc/backup_monitor.conf
 sudo /usr/local/bin/backup_monitor.sh
 ```
