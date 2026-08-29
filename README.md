@@ -31,7 +31,7 @@
 | [`backup_monitor_html.py`](backup_monitor_html.py) | Генерация HTML |
 | [`backup_monitor.conf.example`](backup_monitor.conf.example) | Публичный шаблон конфигурации PBMS |
 | [`msmtprc.example`](msmtprc.example) | Публичный шаблон конфигурации SMTP без учётных данных |
-| [`backup_monitor.cron`](backup_monitor.cron) | Ежедневный запуск в 08:00 |
+| [`backup_monitor.cron`](backup_monitor.cron) | Ежедневный запуск в 09:00 |
 | [`install.sh`](install.sh) | Установка скриптов и cron-задачи |
 | [`tests/test_mock.sh`](tests/test_mock.sh) | Локальная проверка с mock `pvesh` |
 | [`.gitignore`](.gitignore) | Исключение рабочих конфигов, секретов и артефактов |
