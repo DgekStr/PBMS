@@ -1,3 +1,2 @@
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 8 * * * root /usr/local/bin/backup_monitor.sh
+# PBMS - Ежедневный отчет по бэкапам в 09:00
+0 9 * * * root /usr/local/bin/backup_monitor.sh > /dev/null 2>&1

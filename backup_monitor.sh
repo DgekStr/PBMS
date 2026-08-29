@@ -1,10 +1,8 @@
 #!/bin/bash
 # PBMS - Proxmox Backup Monitoring System
-# Проект сервиса подготовлен для публикации на https://focuslens.dev
-# © 2026 FocusLens. Все права защищены.
 # Сбор данных, генерация HTML и отправка на почту
 
-# Конфигурация. Для тестов можно указать PBMS_CONFIG.
+# Конфигурация
 CONFIG_FILE="${PBMS_CONFIG:-/etc/backup_monitor.conf}"
 [[ -r "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
 

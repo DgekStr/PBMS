@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PBMS — пример письма</title>
+  <title>PBMS — пример отчёта</title>
   <style>
     :root { color-scheme: light; }
     * { box-sizing: border-box; }
@@ -35,7 +35,7 @@
   <main class="mail">
     <header class="head">
       <h1>📊 Отчёт по бэкапам Proxmox</h1>
-      <div class="meta">Demo Cluster · 28.08.2026 08:00 · Нод: 2 · получатель: recipient@example.com</div>
+      <div class="meta">Demo Cluster · 28.08.2026 09:00 · Нод: 2 · получатель: recipient@example.com</div>
     </header>
     <section class="content">
       <div class="stats">
@@ -46,18 +46,18 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Нода</th><th>ID</th><th>Имя</th><th>Тип</th><th>Статус</th><th>Последний бэкап</th><th>Размер</th><th>Статус бэкапа</th></tr></thead>
+          <thead><tr><th>Нода</th><th>ID</th><th>Имя</th><th>Тип</th><th>Статус</th><th>Последний бэкап</th><th>Размер</th><th>Хранилище</th><th>Статус бэкапа</th></tr></thead>
           <tbody>
-            <tr><td><strong>node-demo-01</strong></td><td>101</td><td>web-demo</td><td>VM</td><td class="ok">● running</td><td>28.08.2026 06:12</td><td>8.4G</td><td class="ok">✅ OK</td></tr>
-            <tr><td><strong>node-demo-01</strong></td><td>102</td><td>db-demo</td><td>VM</td><td class="warn">● stopped</td><td>27.08.2026 06:10</td><td>12.1G</td><td class="error">❌ Ошибка</td></tr>
-            <tr><td><strong>node-demo-02</strong></td><td>201</td><td>dns-demo</td><td>LXC</td><td class="ok">● running</td><td>28.08.2026 06:15</td><td>420M</td><td class="ok">✅ OK</td></tr>
-            <tr><td><strong>node-demo-02</strong></td><td>202</td><td>monitor-demo</td><td>LXC</td><td class="ok">● running</td><td>—</td><td>—</td><td class="warn">⚠️ Нет бэкапа</td></tr>
+            <tr><td><strong>node-demo-01</strong></td><td>101</td><td>web-demo</td><td>VM</td><td class="ok">● running</td><td>28.08.2026 06:12</td><td>8.4G</td><td>/mnt/pve/backup/dump</td><td class="ok">✅ OK</td></tr>
+            <tr><td><strong>node-demo-01</strong></td><td>102</td><td>db-demo</td><td>VM</td><td class="warn">● stopped</td><td>27.08.2026 06:10</td><td>12.1G</td><td>/mnt/hdd1/dump</td><td class="error">❌ Ошибка</td></tr>
+            <tr><td><strong>node-demo-02</strong></td><td>201</td><td>dns-demo</td><td>LXC</td><td class="ok">● running</td><td>28.08.2026 06:15</td><td>420M</td><td>/var/lib/vz/dump</td><td class="ok">✅ OK</td></tr>
+            <tr><td><strong>node-demo-02</strong></td><td>202</td><td>monitor-demo</td><td>LXC</td><td class="ok">● running</td><td>—</td><td>—</td><td>—</td><td class="warn">⚠️ Нет бэкапа</td></tr>
           </tbody>
         </table>
       </div>
       <div class="notice"><strong>ℹ️ Состояние сбора</strong><br>Сбоев сбора нет. Это демонстрационное письмо: все ноды, VM, LXC, адреса и значения являются тестовыми.</div>
     </section>
-    <footer>PBMS · Proxmox Backup Monitoring System · Проект сервиса подготовлен для <a href="https://focuslens.dev">focuslens.dev</a><br>© 2026 FocusLens. Все права защищены.</footer>
+    <footer>PBMS · Proxmox Backup Monitoring System · Dgek.ru</footer>
   </main>
 </body>
 </html>

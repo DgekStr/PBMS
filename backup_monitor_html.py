@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# PBMS — проект сервиса подготовлен для публикации на https://focuslens.dev
-# © 2026 FocusLens. Все права защищены.
 import html,json,sys
 from datetime import datetime
 
@@ -19,6 +17,11 @@ def bstatus(x):
         return '<span class="warn">⚠️ Нет бэкапа</span>'
     return '<span class="bad">❌ Ошибка</span>' if b['status'] == 'ERROR' else '<span class="good">✅ OK</span>'
 
+
+def backup_path(x):
+    backup = x.get('backup') or {}
+    return backup.get('path', '—')
+
 def card(a, b, c):
     return f'<div class="card"><div class="card-label">{a}</div><div class="card-value">{b}</div><div class="card-sub">{c}</div></div>'
 
@@ -35,6 +38,7 @@ for x in sorted(items, key=lambda q: (q['node'], q['type'], q['id'])):
             <td><span class="{cls}">● {esc(x['status'])}</span></td>
             <td>{esc(b.get('date', '—').replace('T', ' '))}</td>
             <td>{esc(b.get('size', '—'))}</td>
+            <td>{esc(backup_path(x))}</td>
             <td>{bstatus(x)}</td>
         </tr>
     """)
@@ -47,7 +51,7 @@ doc = f'''<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PBMS — Отчет по бэкапам Proxmox</title>
+    <title>PBMS — Отчёт по бэкапам Proxmox</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -188,7 +192,7 @@ doc = f'''<!DOCTYPE html>
 </head>
 <body>
 <div class="container">
-    <h1>📊 Отчет по бэкапам Proxmox</h1>
+    <h1>📊 Отчёт по бэкапам Proxmox</h1>
     <div class="subtitle">{esc(host)} · {dt} · Нод: {len(data['nodes'])}</div>
 
     <div class="stats">
@@ -211,11 +215,12 @@ doc = f'''<!DOCTYPE html>
                     <th>Статус</th>
                     <th>Последний бэкап</th>
                     <th>Размер</th>
+                    <th>Хранилище</th>
                     <th>Статус бэкапа</th>
                 </tr>
             </thead>
             <tbody>
-                {''.join(rows) or '<tr><td colspan="8" style="text-align:center;color:#a0aec0;">Объекты не найдены</td></tr>'}
+                {''.join(rows) or '<tr><td colspan="9" style="text-align:center;color:#a0aec0;">Объекты не найдены</td></tr>'}
             </tbody>
         </table>
     </div>
@@ -226,8 +231,7 @@ doc = f'''<!DOCTYPE html>
     </div>
 
     <div class="footer">
-        PBMS · Proxmox Backup Monitoring System · <a href="https://focuslens.dev">focuslens.dev</a>
-        <br>© 2026 FocusLens. Все права защищены.
+        PBMS · Proxmox Backup Monitoring System · Dgek.ru
     </div>
 </div>
 </body>

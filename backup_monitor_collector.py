@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# PBMS — проект сервиса подготовлен для публикации на https://focuslens.dev
-# © 2026 FocusLens. Все права защищены.
 import json,os,re,subprocess,sys
 from datetime import datetime
 
@@ -10,13 +8,34 @@ errors = []
 objects = []
 nodes = nodes_arg.split()
 
+# РџРђРџРљР РЎ Р‘Р­РљРђРџРђРњР Р”Р›РЇ РљРђР–Р”РћР™ РќРћР”Р« (РёР· СЃРєСЂРёРЅР°)
+NODE_BACKUP_PATHS = {
+    "pve": [
+        "/mnt/pve/backup/dump",
+    ],
+    "pve2": [
+        "/mnt/pve/backup/dump",
+        "/mnt/hdd1/dump",
+        "/mnt/hdd2/dump",
+        "/var/lib/vz/dump",
+    ],
+    "pve3": [
+        "/mnt/pve/backup/dump",
+        "/mnt/pve/HDD4_1/dump",
+    ],
+}
+
+# Р Р°СЃС€РёСЂРµРЅРёСЏ С„Р°Р№Р»РѕРІ Р±СЌРєР°РїРѕРІ (РёСЃРєР»СЋС‡Р°РµРј .notes Рё .log)
+BACKUP_EXTENSIONS = ['.vma', '.vma.zst', '.tar', '.tar.zst', '.gz', '.lzo']
+
 def save():
     with open(out, 'w', encoding='utf-8') as fh:
         json.dump({
             'generated_at': datetime.now().isoformat(),
             'nodes': nodes,
             'objects': objects,
-            'errors': errors
+            'errors': errors,
+            'node_backup_paths': NODE_BACKUP_PATHS
         }, fh, ensure_ascii=False, indent=2)
 
 save()
@@ -42,42 +61,82 @@ def pvesh(path):
         return []
 
 def size(n):
-    n = float(n)
+    try:
+        n = float(n)
+    except:
+        return '0B'
     for u in ('B','K','M','G','T','P'):
         if n < 1024 or u == 'P':
             return f'{n:.1f}{u}' if u != 'B' else f'{int(n)}B'
         n /= 1024
+    return f'{n:.1f}P'
 
-def find_backup(kind, vmid):
-    if not os.path.isdir(backup_dir):
+def is_backup_file(filename, kind, vmid):
+    """РџСЂРѕРІРµСЂСЏРµС‚, СЏРІР»СЏРµС‚СЃСЏ Р»Рё С„Р°Р№Р» РѕСЃРЅРѕРІРЅС‹Рј С„Р°Р№Р»РѕРј Р±СЌРєР°РїР° (РЅРµ .notes Рё РЅРµ .log)"""
+    if not filename.startswith(f'vzdump-{kind}-{vmid}-'):
+        return False
+    if filename.endswith('.notes') or filename.endswith('.log'):
+        return False
+    # РџСЂРѕРІРµСЂСЏРµРј СЂР°СЃС€РёСЂРµРЅРёРµ
+    for ext in BACKUP_EXTENSIONS:
+        if filename.endswith(ext):
+            return True
+    # Р•СЃР»Рё РЅРµС‚ РёР·РІРµСЃС‚РЅРѕРіРѕ СЂР°СЃС€РёСЂРµРЅРёСЏ, РЅРѕ С„Р°Р№Р» РЅРµ .notes/.log вЂ” СЃС‡РёС‚Р°РµРј Р±СЌРєР°РїРѕРј
+    return True
+
+def find_backup_for_node(kind, vmid, node):
+    """РџРѕРёСЃРє Р±СЌРєР°РїР° РўРћР›Р¬РљРћ РІ РїР°РїРєР°С… СѓРєР°Р·Р°РЅРЅРѕР№ РЅРѕРґС‹"""
+    best = None
+    best_mtime = 0
+
+    paths = NODE_BACKUP_PATHS.get(node, [])
+
+    for path in paths:
+        if not os.path.isdir(path):
+            continue
+        try:
+            for name in os.listdir(path):
+                if not is_backup_file(name, kind, vmid):
+                    continue
+                filepath = os.path.join(path, name)
+                if os.path.isfile(filepath):
+                    mtime = os.path.getmtime(filepath)
+                    if mtime > best_mtime:
+                        best_mtime = mtime
+                        best = {
+                            'path': path,
+                            'file': name,
+                            'fullpath': filepath,
+                            'mtime': mtime
+                        }
+        except OSError:
+            continue
+
+    if not best:
         return None
-    files = []
-    for name in os.listdir(backup_dir):
-        if name.startswith(f'vzdump-{kind}-{vmid}-') and not name.endswith('.log'):
-            path = os.path.join(backup_dir, name)
-            if os.path.isfile(path):
-                files.append((os.path.getmtime(path), path, name))
-    if not files:
-        return None
-    _, path, name = max(files)
-    logpath = path + '.log'
+
+    logpath = best['fullpath'] + '.log'
     result = 'OK'
     if os.path.exists(logpath):
         try:
-            if re.search(r'\b(error|failed|failure|critical|unable)\b', 
+            if re.search(r'\b(error|failed|failure|critical|unable)\b',
                          open(logpath, errors='replace').read()[-20000:].lower()):
                 result = 'ERROR'
         except OSError:
             result = 'ERROR'
+
     return {
-        'date': datetime.fromtimestamp(os.path.getmtime(path)).isoformat(timespec='seconds'),
-        'size': size(os.path.getsize(path)),
+        'date': datetime.fromtimestamp(best['mtime']).isoformat(timespec='seconds'),
+        'size': size(os.path.getsize(best['fullpath'])),
         'status': result,
-        'file': name
+        'file': best['file'],
+        'path': best['path']
     }
 
 for node in nodes:
     print(f'PBMS: processing node {node}', file=sys.stderr, flush=True)
+    print(f'PBMS: backup paths for {node}: {NODE_BACKUP_PATHS.get(node, [])}', file=sys.stderr, flush=True)
+
     for kind, endpoint, filekind in [('VM','qemu','qemu'), ('LXC','lxc','lxc')]:
         for item in pvesh(f'/nodes/{node}/{endpoint}'):
             vmid = str(item.get('vmid', item.get('id', '')))
@@ -85,13 +144,16 @@ for node in nodes:
                 continue
             cfg = pvesh(f'/nodes/{node}/{endpoint}/{vmid}/config')
             cfg = cfg[0] if cfg else {}
+
+            backup_info = find_backup_for_node(filekind, vmid, node)
+
             objects.append({
                 'node': node,
                 'id': vmid,
                 'name': cfg.get('name') or item.get('name') or f'{kind}-{vmid}',
                 'type': kind,
                 'status': item.get('status', 'unknown'),
-                'backup': find_backup(filekind, vmid)
+                'backup': backup_info
             })
             save()
 save()

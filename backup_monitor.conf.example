@@ -1,6 +1,4 @@
 # PBMS configuration example. Replace every value marked CHANGE_ME.
-# Проект сервиса подготовлен для публикации на https://focuslens.dev
-# © 2026 FocusLens. Все права защищены.
 PBMS_NODES="pve pve2 pve3"
 PBMS_BACKUP_DIR="/mnt/pve/backup/dump"
 PBMS_RECIPIENT="CHANGE_ME@example.com"
