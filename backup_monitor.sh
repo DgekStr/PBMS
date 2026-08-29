@@ -45,10 +45,10 @@ encode_rfc2047(){
   cat "$REPORT_FILE"
 } | "$PBMS_SMTP_BIN" -t
 
-# Отправка краткого уведомления в Mattermost. Webhook не попадает в отчёт или Git.
+# Отправка того же HTML-отчёта в Mattermost. Webhook не попадает в отчёт или Git.
 if [[ "$PBMS_MATTERMOST_ENABLED" == "true" ]]; then
   if [[ "$PBMS_MATTERMOST_ONLY_ON_ERROR" != "true" || $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(bool(d.get("errors") or any(not x.get("backup") or x["backup"].get("status") == "ERROR" for x in d.get("objects", [])))' "$DATA_FILE") == "True" ]]; then
-    /usr/local/bin/backup_monitor_mattermost.py "$DATA_FILE" "$PBMS_MATTERMOST_WEBHOOK_URL" "$PBMS_HOSTNAME" || echo "⚠️ Mattermost notification failed" >&2
+    /usr/local/bin/backup_monitor_mattermost.py "$DATA_FILE" "$REPORT_FILE" "$PBMS_MATTERMOST_WEBHOOK_URL" "$PBMS_HOSTNAME" || echo "⚠️ Mattermost notification failed" >&2
   fi
 fi
 

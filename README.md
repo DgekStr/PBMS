@@ -3,7 +3,7 @@
 > Проект сервиса подготовлен для публикации на [focuslens.dev](https://focuslens.dev).
 > © 2026 FocusLens. Все права защищены.
 
-Минималистичный мониторинг резервных копий виртуальных машин и контейнеров в Proxmox VE 7/8. PBMS получает список VM/LXC через `pvesh`, ищет последние файлы `vzdump-*`, проверяет связанные `.log`, формирует HTML-отчёт и отправляет его через локально настроенный MTA, например `msmtp`.
+Минималистичный мониторинг резервных копий виртуальных машин и контейнеров в Proxmox VE 7/8. PBMS получает список VM/LXC через `pvesh`, ищет последние файлы `vzdump-*`, формирует единый отчёт и отправляет его по email и в Mattermost через Incoming Webhook. Для email сохраняется HTML-версия, а для Mattermost из того же отчёта формируется читаемое текстовое представление.
 
 ![Пример HTML-отчёта PBMS](accets/demo.png)
 
@@ -17,7 +17,7 @@
 - анализ последних 20 000 символов `.log` на признаки ошибок;
 - отдельная фиксация ошибок и таймаутов `pvesh`;
 - постепенное сохранение JSON во время сбора;
-- адаптивный HTML-отчёт для письма;
+- единый отчёт для email и Mattermost: HTML по почте и текстовое представление в webhook;
 - защита от публикации локальных конфигураций и runtime-файлов;
 - поиск backup-файлов в нескольких хранилищах для каждой ноды;
 - mock-тест без установленного Proxmox.
@@ -26,10 +26,10 @@
 
 | Файл | Назначение |
 |---|---|
-| [`backup_monitor.sh`](backup_monitor.sh) | Оркестрация сбора, генерации отчёта, отправки письма и Mattermost-уведомления |
+| [`backup_monitor.sh`](backup_monitor.sh) | Оркестрация сбора, генерации единого отчёта и отправки email/Mattermost |
 | [`backup_monitor_collector.py`](backup_monitor_collector.py) | Сбор данных через `pvesh` и поиск backup-файлов |
 | [`backup_monitor_html.py`](backup_monitor_html.py) | Генерация HTML |
-| [`backup_monitor_mattermost.py`](backup_monitor_mattermost.py) | Отправка краткого статуса в Mattermost через Incoming Webhook |
+| [`backup_monitor_mattermost.py`](backup_monitor_mattermost.py) | Преобразование общего отчёта в Mattermost-сообщение через Incoming Webhook |
 | [`backup_monitor.conf.example`](backup_monitor.conf.example) | Публичный шаблон конфигурации PBMS |
 | [`msmtprc.example`](msmtprc.example) | Публичный шаблон конфигурации SMTP без учётных данных |
 | [`backup_monitor.cron`](backup_monitor.cron) | Ежедневный запуск в 09:00 |
@@ -143,7 +143,7 @@ cat /tmp/backup_report.html
 bash tests/test_mock.sh
 ```
 
-Тест проверяет генерацию HTML и наличие данных mock-объектов. Отправка почты в тестовом окружении намеренно может завершиться ошибкой, поскольку MTA не требуется для проверки сбора и генерации. Уведомления Mattermost в mock-тесте не отправляются.
+Тест проверяет генерацию HTML и наличие данных mock-объектов. Отправка почты в тестовом окружении намеренно может завершиться ошибкой, поскольку MTA не требуется для проверки сбора и генерации. При включённом Mattermost тот же HTML-отчёт отправляется в webhook; в mock-тесте внешняя отправка не выполняется.
 
 ## Безопасность перед публикацией
 
