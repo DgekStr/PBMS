@@ -30,6 +30,13 @@ NODE_BACKUP_PATHS = {
 # Расширения файлов бэкапов (исключаем .notes и .log)
 BACKUP_EXTENSIONS = ['.vma', '.vma.zst', '.tar', '.tar.zst', '.gz', '.lzo']
 
+SSH_OPTS = [
+    'ssh',
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=5',
+    '-o', 'StrictHostKeyChecking=accept-new',
+]
+
 
 def discovered_backup_paths():
     """Находит каталоги дампов Proxmox-хранилищ типа directory без использования имён хранилищ."""
@@ -76,6 +83,64 @@ def discovered_backup_paths():
         paths.extend((os.path.join(fallback, 'dump'), fallback))
 
     return paths
+
+def list_remote_dir(path, node):
+    """Читает список файлов каталога на удалённой ноде по ssh.
+
+    Возвращает список кортежей (имя, mtime, размер). Путь может не
+    существовать локально, потому что является локальным диском другой ноды.
+    """
+    cmd = "find '%s' -maxdepth 1 -type f -printf '%%f|%%T@|%%s\\n' 2>/dev/null" % path
+    try:
+        p = subprocess.run(
+            [*SSH_OPTS, node, cmd],
+            capture_output=True, text=True, timeout=PVESH_TIMEOUT, check=True
+        )
+    except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+        errors.append(f'{path}: ssh {node}: {e}')
+        return []
+    result = []
+    for line in p.stdout.splitlines():
+        parts = line.rsplit('|', 2)
+        if len(parts) == 3:
+            try:
+                result.append((parts[0], float(parts[1]), int(float(parts[2]))))
+            except ValueError:
+                continue
+    return result
+
+def remote_tail(path, node, limit=20000):
+    """Читает хвост файла на удалённой ноде по ssh (для проверки лога бэкапа)."""
+    cmd = "tail -c %d -- '%s' 2>/dev/null || true" % (limit, path)
+    try:
+        p = subprocess.run(
+            [*SSH_OPTS, node, cmd],
+            capture_output=True, text=True, timeout=PVESH_TIMEOUT, check=True
+        )
+        return p.stdout
+    except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+        errors.append(f'{path}: ssh {node}: {e}')
+        return ''
+
+def entries_for_path(path, owner):
+    """Возвращает список (имя, mtime, размер) файлов каталога path.
+
+    Сначала пробует локально; если каталог недоступен, а owner задан —
+    читает его по ssh с ноды-владельца.
+    """
+    if os.path.isdir(path):
+        try:
+            result = []
+            for name in os.listdir(path):
+                filepath = os.path.join(path, name)
+                if os.path.isfile(filepath):
+                    result.append((name, os.path.getmtime(filepath), os.path.getsize(filepath)))
+            return result
+        except OSError:
+            pass
+    if owner:
+        return list_remote_dir(path, owner)
+    return []
 
 def save():
     with open(out, 'w', encoding='utf-8') as fh:
@@ -134,52 +199,61 @@ def is_backup_file(filename, kind, vmid):
     return True
 
 def find_backup_for_node(kind, vmid, node):
-    """Находит самый новый бэкап среди стандартных и дополнительных путей ноды."""
+    """Находит самый новый бэкап среди стандартных и дополнительных путей ноды.
+
+    Если путь является локальным диском другой ноды и недоступен локально,
+    каталог читается по ssh с этой ноды. Поэтому свежие дампы, лежащие,
+    например, в /mnt/hdd2/dump на pve2, будут видны из отчёта, собираемого на pve.
+    """
     best = None
     best_mtime = 0
 
-    # PBMS_BACKUP_DIR и встроенные пути по-прежнему поддерживаются, а поиск
-    # хранилищ и точек монтирования Proxmox делает поиск независимым от имён хранилищ.
-    paths = []
-    for path in [backup_dir, *NODE_BACKUP_PATHS.get(node, []), *discovered_backup_paths()]:
-        if path and path not in paths:
-            paths.append(path)
+    # Собираем кандидатов: (путь, владелец). Владелец None — путь локальный,
+    # иначе путь принадлежит указанной ноде и при недоступности локально
+    # читается по ssh с неё.
+    candidates = [(backup_dir, None)]
+    candidates += [(path, node) for path in NODE_BACKUP_PATHS.get(node, [])]
+    candidates += [(path, None) for path in discovered_backup_paths()]
 
-    for path in paths:
-        if not os.path.isdir(path):
+    seen = set()
+    for path, owner in candidates:
+        if not path or path in seen:
             continue
-        try:
-            for name in os.listdir(path):
-                if not is_backup_file(name, kind, vmid):
-                    continue
-                filepath = os.path.join(path, name)
-                if os.path.isfile(filepath):
-                    mtime = os.path.getmtime(filepath)
-                    if mtime > best_mtime:
-                        best_mtime = mtime
-                        best = {
-                            'path': path,
-                            'file': name,
-                            'fullpath': filepath,
-                            'mtime': mtime
-                        }
-        except OSError:
-            continue
+        seen.add(path)
+
+        for name, mtime, fsize in entries_for_path(path, owner):
+            if not is_backup_file(name, kind, vmid):
+                continue
+            if mtime > best_mtime:
+                best_mtime = mtime
+                best = {
+                    'path': path,
+                    'file': name,
+                    'fullpath': os.path.join(path, name),
+                    'mtime': mtime,
+                    'size_bytes': fsize,
+                    'owner': owner,
+                }
 
     if not best:
         return None
 
     logpath = best['fullpath'] + '.log'
     result = 'OK'
-    if os.path.exists(logpath):
-        try:
-            if re.search(r'\b(error|failed|failure|critical|unable)\b',
-                         open(logpath, errors='replace').read()[-20000:].lower()):
+    if best['owner'] is None:
+        if os.path.exists(logpath):
+            try:
+                if re.search(r'\b(error|failed|failure|critical|unable)\b',
+                             open(logpath, errors='replace').read()[-20000:].lower()):
+                    result = 'ERROR'
+            except OSError:
                 result = 'ERROR'
-        except OSError:
+    else:
+        log_content = remote_tail(logpath, best['owner'])
+        if re.search(r'\b(error|failed|failure|critical|unable)\b', log_content.lower()):
             result = 'ERROR'
 
-    archive_size = os.path.getsize(best['fullpath'])
+    archive_size = best['size_bytes']
     too_small = archive_size < MIN_BACKUP_SIZE_BYTES
     if too_small:
         result = 'TOO_SMALL'
