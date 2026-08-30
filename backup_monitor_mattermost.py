@@ -56,18 +56,19 @@ def current_report(data, hostname):
         f"• Всего объектов: {len(objects)} (запущено: {running})",
         f"• Бэкапы: ✅ {backups_ok} OK · ❌ {backups_error} ошибок · ⚠️ {no_backup} нет бэкапа",
         "",
-        "```text",
-        "Нода\tID\tИмя\tСтатус\tБэкап\tРазмер\tСтатус",
+        "| Нода | ID | Имя | Статус | Бэкап | Размер | Статус |",
+        "|---|---:|---|---|---|---:|---|",
     ]
     for item in sorted(objects, key=lambda x: (x.get("node", ""), x.get("type", ""), str(x.get("id", "")))):
         backup = item.get("backup") or {}
         status = "🟢 running" if item.get("status") == "running" else "🔴 " + clean(item.get("status"), "unknown")
         backup_status = "✅ OK" if backup.get("status") == "OK" else "❌ ERROR" if backup.get("status") == "ERROR" else "⚠️ Нет"
-        lines.append("\t".join([
+        cells = [
             clean(item.get("node")), clean(item.get("id")), clean(item.get("name")), status,
             format_date(backup.get("date")), clean(backup.get("size")), backup_status,
-        ]))
-    lines.append("```")
+        ]
+        # Escape Markdown table delimiters so object names cannot break the layout.
+        lines.append("| " + " | ".join(value.replace("|", "\\|").replace("\n", " ") for value in cells) + " |")
     if data.get("errors"):
         lines.extend(["", "⚠️ **Ошибки сбора:**", *[f"• {error}" for error in data["errors"]]])
     return "\n".join(lines)
