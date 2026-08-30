@@ -30,6 +30,46 @@ NODE_BACKUP_PATHS = {
 # Р Р°СЃС€РёСЂРµРЅРёСЏ С„Р°Р№Р»РѕРІ Р±СЌРєР°РїРѕРІ (РёСЃРєР»СЋС‡Р°РµРј .notes Рё .log)
 BACKUP_EXTENSIONS = ['.vma', '.vma.zst', '.tar', '.tar.zst', '.gz', '.lzo']
 
+
+def discovered_backup_paths():
+    """Discover Proxmox directory-storage dump paths without storage names."""
+    paths = []
+
+    # A directory storage can be mounted at any path (for example
+    # /mnt/pve/HDD2), so storage IDs must not be used to construct paths.
+    try:
+        in_dir_storage = False
+        with open('/etc/pve/storage.cfg', encoding='utf-8', errors='replace') as storage_cfg:
+            for line in storage_cfg:
+                if line.startswith('dir:'):
+                    in_dir_storage = True
+                    continue
+                if line and not line[0].isspace():
+                    in_dir_storage = False
+                if in_dir_storage:
+                    path_match = re.match(r'\s+path\s+(\S+)', line)
+                    if path_match:
+                        storage_path = path_match.group(1).rstrip('/')
+                        paths.extend((os.path.join(storage_path, 'dump'), storage_path))
+    except OSError:
+        pass
+
+    # Include mounted Proxmox storage roots.  This catches mounts such as
+    # /mnt/pve/HDD2 even when storage.cfg uses a different storage name.
+    try:
+        with open('/proc/mounts', encoding='utf-8', errors='replace') as mounts:
+            for line in mounts:
+                fields = line.split()
+                if len(fields) < 2:
+                    continue
+                mountpoint = fields[1].replace('\\040', ' ').replace('\\011', '\\t').rstrip('/')
+                if mountpoint.startswith(('/mnt/', '/media/', '/var/lib/vz')):
+                    paths.extend((os.path.join(mountpoint, 'dump'), mountpoint))
+    except OSError:
+        pass
+
+    return paths
+
 def save():
     with open(out, 'w', encoding='utf-8') as fh:
         json.dump({
@@ -91,11 +131,10 @@ def find_backup_for_node(kind, vmid, node):
     best = None
     best_mtime = 0
 
-    # PBMS_BACKUP_DIR is the configured default path.  Include it explicitly
-    # because NODE_BACKUP_PATHS contains only built-in alternate paths and may
-    # not match a site's configuration.
+    # PBMS_BACKUP_DIR and built-in paths remain supported, while Proxmox
+    # storage/mount discovery makes the search independent of storage names.
     paths = []
-    for path in [backup_dir, *NODE_BACKUP_PATHS.get(node, [])]:
+    for path in [backup_dir, *NODE_BACKUP_PATHS.get(node, []), *discovered_backup_paths()]:
         if path and path not in paths:
             paths.append(path)
 
