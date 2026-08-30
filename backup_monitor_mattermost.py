@@ -5,10 +5,44 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from html import unescape
+from html.parser import HTMLParser
 
 
 MAX_MESSAGE_LENGTH = 12000
+
+
+class MattermostTextParser(HTMLParser):
+    """Extract readable body text while ignoring CSS, metadata and scripts."""
+
+    SKIP_TAGS = {"head", "style", "script", "noscript"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP_TAGS:
+            self.skip_depth += 1
+        elif not self.skip_depth and tag in {"h1", "h2", "h3", "p", "li", "tr", "div", "th", "td"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP_TAGS and self.skip_depth:
+            self.skip_depth -= 1
+        elif not self.skip_depth and tag in {"h1", "h2", "h3", "p", "li", "tr", "div", "th", "td"}:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self.skip_depth:
+            self.parts.append(data)
+
+
+def html_to_text(report):
+    parser = MattermostTextParser()
+    parser.feed(report)
+    parser.close()
+    return re.sub(r"[ \t]+", " ", re.sub(r"\n{3,}", "\n\n", "".join(parser.parts))).strip()
 
 
 def format_changes(diff):
@@ -55,8 +89,7 @@ def main() -> int:
         print(f"PBMS Mattermost: cannot read report files: {exc}", file=sys.stderr)
         return 1
 
-    text = unescape(re.sub(r"<[^>]+>", " ", report))
-    text = re.sub(r"\s+", " ", text).strip()
+    text = html_to_text(report)
     summary = f"Объектов: {len(data.get('objects', []))} · Ошибок сбора: {len(data.get('errors', []))}"
     message = f"**PBMS | {hostname}**\n\n{format_changes(diff)}\n\n**Текущий отчёт**\n{summary}\n{text}"
     if len(message) > MAX_MESSAGE_LENGTH:
