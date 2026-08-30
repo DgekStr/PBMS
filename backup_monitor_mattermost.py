@@ -1,48 +1,21 @@
 #!/usr/bin/env python3
-"""Send the current PBMS report and its change list to Mattermost."""
+"""Send a compact, readable PBMS report and change list to Mattermost."""
 import json
-import re
 import sys
 import urllib.error
 import urllib.request
-from html.parser import HTMLParser
-
+from datetime import datetime
 
 MAX_MESSAGE_LENGTH = 12000
 
 
-class MattermostTextParser(HTMLParser):
-    """Extract readable body text while ignoring CSS, metadata and scripts."""
-
-    SKIP_TAGS = {"head", "style", "script", "noscript"}
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.parts = []
-        self.skip_depth = 0
-
-    def handle_starttag(self, tag, attrs):
-        if tag in self.SKIP_TAGS:
-            self.skip_depth += 1
-        elif not self.skip_depth and tag in {"h1", "h2", "h3", "p", "li", "tr", "div", "th", "td"}:
-            self.parts.append("\n")
-
-    def handle_endtag(self, tag):
-        if tag in self.SKIP_TAGS and self.skip_depth:
-            self.skip_depth -= 1
-        elif not self.skip_depth and tag in {"h1", "h2", "h3", "p", "li", "tr", "div", "th", "td"}:
-            self.parts.append("\n")
-
-    def handle_data(self, data):
-        if not self.skip_depth:
-            self.parts.append(data)
+def clean(value, fallback="—"):
+    return str(value) if value not in (None, "") else fallback
 
 
-def html_to_text(report):
-    parser = MattermostTextParser()
-    parser.feed(report)
-    parser.close()
-    return re.sub(r"[ \t]+", " ", re.sub(r"\n{3,}", "\n\n", "".join(parser.parts))).strip()
+def format_date(value):
+    value = clean(value)
+    return value.replace("T", " ")[:16] if value != "—" else value
 
 
 def format_changes(diff):
@@ -53,7 +26,7 @@ def format_changes(diff):
     if not changes:
         return "_Изменений с предыдущей проверки нет._"
     lines = [
-        "**Изменения с предыдущей проверки**",
+        "**🔄 Изменения с предыдущей проверки**",
         f"Добавлено: {summary.get('added', 0)} · Удалено: {summary.get('removed', 0)} · Изменено: {summary.get('changed', 0)}",
     ]
     for item in changes:
@@ -63,9 +36,40 @@ def format_changes(diff):
         if kind in ("added", "removed"):
             lines.append(f"{prefix} {label}: {item.get('message', kind)}")
         else:
-            old = item.get("old") if item.get("old") not in (None, "") else "нет"
-            new = item.get("new") if item.get("new") not in (None, "") else "нет"
+            old = clean(item.get("old"), "нет")
+            new = clean(item.get("new"), "нет")
             lines.append(f"{prefix} {label} — {item.get('field_label', item.get('field', 'поле'))}: `{old}` → `{new}`")
+    return "\n".join(lines)
+
+
+def current_report(data, hostname):
+    objects = data.get("objects", [])
+    running = sum(x.get("status") == "running" for x in objects)
+    backups_ok = sum(bool(x.get("backup")) and x["backup"].get("status") == "OK" for x in objects)
+    backups_error = sum(bool(x.get("backup")) and x["backup"].get("status") == "ERROR" for x in objects)
+    no_backup = len(objects) - backups_ok - backups_error
+    lines = [
+        "**📊 Текущий отчёт**",
+        f"{hostname} · {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M')}",
+        "",
+        "📈 **Статистика:**",
+        f"• Всего объектов: {len(objects)} (запущено: {running})",
+        f"• Бэкапы: ✅ {backups_ok} OK · ❌ {backups_error} ошибок · ⚠️ {no_backup} нет бэкапа",
+        "",
+        "```text",
+        "Нода\tID\tИмя\tСтатус\tБэкап\tРазмер\tСтатус",
+    ]
+    for item in sorted(objects, key=lambda x: (x.get("node", ""), x.get("type", ""), str(x.get("id", "")))):
+        backup = item.get("backup") or {}
+        status = "🟢 running" if item.get("status") == "running" else "🔴 " + clean(item.get("status"), "unknown")
+        backup_status = "✅ OK" if backup.get("status") == "OK" else "❌ ERROR" if backup.get("status") == "ERROR" else "⚠️ Нет"
+        lines.append("\t".join([
+            clean(item.get("node")), clean(item.get("id")), clean(item.get("name")), status,
+            format_date(backup.get("date")), clean(backup.get("size")), backup_status,
+        ]))
+    lines.append("```")
+    if data.get("errors"):
+        lines.extend(["", "⚠️ **Ошибки сбора:**", *[f"• {error}" for error in data["errors"]]])
     return "\n".join(lines)
 
 
@@ -73,28 +77,21 @@ def main() -> int:
     if len(sys.argv) != 6:
         print(f"usage: {sys.argv[0]} DATA_FILE REPORT_FILE DIFF_FILE WEBHOOK_URL HOSTNAME", file=sys.stderr)
         return 2
-
-    data_file, report_file, diff_file, webhook_url, hostname = sys.argv[1:]
+    data_file, _report_file, diff_file, webhook_url, hostname = sys.argv[1:]
     if not webhook_url or webhook_url == "CHANGE_ME":
         return 0
-
     try:
         with open(data_file, encoding="utf-8") as fh:
             data = json.load(fh)
         with open(diff_file, encoding="utf-8") as fh:
             diff = json.load(fh)
-        with open(report_file, encoding="utf-8") as fh:
-            report = fh.read()
     except (OSError, json.JSONDecodeError) as exc:
         print(f"PBMS Mattermost: cannot read report files: {exc}", file=sys.stderr)
         return 1
 
-    text = html_to_text(report)
-    summary = f"Объектов: {len(data.get('objects', []))} · Ошибок сбора: {len(data.get('errors', []))}"
-    message = f"**PBMS | {hostname}**\n\n{format_changes(diff)}\n\n**Текущий отчёт**\n{summary}\n{text}"
+    message = f"**PBMS | {hostname}**\n\n{format_changes(diff)}\n\n{current_report(data, hostname)}"
     if len(message) > MAX_MESSAGE_LENGTH:
         message = message[:MAX_MESSAGE_LENGTH - 80].rstrip() + "\n\n_Отчёт сокращён из-за ограничения размера Mattermost._"
-
     payload = json.dumps({"text": message}, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(webhook_url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
     try:
@@ -104,7 +101,6 @@ def main() -> int:
     except (OSError, urllib.error.URLError, RuntimeError) as exc:
         print(f"PBMS Mattermost: webhook failed: {exc}", file=sys.stderr)
         return 1
-
     print("PBMS: Mattermost notification sent", file=sys.stderr)
     return 0
 
