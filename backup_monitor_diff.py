@@ -2,9 +2,10 @@
 """Compare two PBMS collector JSON files and write a JSON change report."""
 import json
 import os
+import re
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 FIELDS = (
@@ -47,11 +48,50 @@ def label(item):
     return f"{key[0]} / {key[1]}-{key[2]}" + (f" ({name})" if name else "")
 
 
+def parse_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def parse_size_bytes(value):
+    """Convert collector size values (for example, 200M or 1.5G) to bytes."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if value is None:
+        return None
+    match = re.fullmatch(
+        r"\s*([0-9]+(?:\.[0-9]+)?)\s*([KMGTPE]?)B?\s*",
+        str(value),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    number = float(match.group(1))
+    multiplier = {
+        "": 1,
+        "K": 1024,
+        "M": 1024 ** 2,
+        "G": 1024 ** 3,
+        "T": 1024 ** 4,
+        "P": 1024 ** 5,
+        "E": 1024 ** 6,
+    }[match.group(2).upper()]
+    return number * multiplier
+
+
 def severity(field, old, new):
     if field in ("status", "backup.status"):
-        if str(new).upper() in ("ERROR", "stopped", "unknown"):
+        if str(new).upper() in ("ERROR", "TOO_SMALL", "STOPPED", "UNKNOWN"):
             return "bad"
-        if str(old).upper() in ("ERROR", "stopped", "unknown"):
+        if str(old).upper() in ("ERROR", "TOO_SMALL", "STOPPED", "UNKNOWN"):
+            return "good"
+    if field == "backup.size" and old != new:
+        new_size = parse_size_bytes(new)
+        if new_size is not None and new_size >= 100 * 1024 * 1024:
             return "good"
     return "neutral"
 
@@ -68,7 +108,7 @@ def change(kind, item, field=None, old=None, new=None, message=None):
             "field_label": dict(FIELDS).get(field, field),
             "old": old,
             "new": new,
-            "severity": severity(field, old, new),
+            "severity": "bad" if kind == "stale" else severity(field, old, new),
         })
     if message:
         result["message"] = message
@@ -94,6 +134,14 @@ def compare_reports(previous, current):
             new_value = value(new_item, field)
             if old_value != new_value:
                 changes.append(change("changed", new_item, field, old_value, new_value))
+        old_date = value(old_item, "backup.date")
+        new_date = value(new_item, "backup.date")
+        parsed_date = parse_date(new_date)
+        if old_date == new_date and parsed_date:
+            age = datetime.now(parsed_date.tzinfo) - parsed_date
+            if age > timedelta(days=10):
+                changes.append(change("stale", new_item, "backup.date", new_date, new_date,
+                                      "Дата бэкапа не менялась более 10 дней"))
 
     return {
         "has_previous": True,

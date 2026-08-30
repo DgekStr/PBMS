@@ -48,11 +48,12 @@ for item in changes:
     key = tuple(item.get("key", []))
     row_kinds[key] = item.get("kind", "changed")
     if item.get("field"):
-        changed_fields.setdefault(key, set()).add(item["field"])
+        changed_fields.setdefault(key, {})[item["field"]] = item.get("severity", "neutral")
 
 
 def cell(value, key, field):
-    cls = " changed-cell" if field in changed_fields.get(key, set()) else ""
+    severity = changed_fields.get(key, {}).get(field)
+    cls = f" changed-cell {severity}" if severity else ""
     return f'<td class="{cls.strip()}">{value}</td>' if cls else f"<td>{value}</td>"
 
 
@@ -82,6 +83,8 @@ def change_text(item):
     label = esc(item.get("label", "Объект"))
     if kind in ("added", "removed"):
         return f"<li><b>{'Добавлен' if kind == 'added' else 'Удалён'}:</b> {label}</li>"
+    if kind == "stale":
+        return f"<li class=\"bad\"><b>⚠️ {label}:</b> дата бэкапа не менялась более 10 дней. Нужна проверка!</li>"
     old = esc(str(item.get("old") if item.get("old") not in (None, "") else "нет"))
     new = esc(str(item.get("new") if item.get("new") not in (None, "") else "нет"))
     return f"<li><b>{label}</b>: {esc(item.get('field_label', item.get('field', 'поле')))} — {old} → {new}</li>"
@@ -133,7 +136,7 @@ table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
 th {{ background: #f7fafc; padding: 12px 16px; text-align: left; color: #4a5568; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }}
 td {{ padding: 12px 16px; border-bottom: 1px solid #edf2f7; color: #2d3748; }}
 tr:hover td {{ background: #f7fafc; }}
-.changed-row td {{ background: #fff8e1; }} .added-row td {{ background: #e6ffed; }} .changed-cell {{ box-shadow: inset 0 -3px 0 #ed8936; }}
+.changed-row td {{ background: #fff8e1; }} .added-row td {{ background: #e6ffed; }} .changed-cell {{ box-shadow: inset 0 -3px 0 #ed8936; }} .changed-cell.good {{ background: #e6ffed; box-shadow: inset 0 -3px 0 #38a169; }} .changed-cell.bad {{ background: #fff0f0; box-shadow: inset 0 -3px 0 #e53e3e; }}
 .type-badge {{ display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #e2e8f0; }}
 .status-running,.good {{ color: #38a169; font-weight: 600; }} .status-stopped,.bad {{ color: #e53e3e; font-weight: 600; }} .warn {{ color: #dd6b20; font-weight: 600; }} .bad-size {{ color: #e53e3e; font-weight: 700; background: #fff5f5; padding: 2px 5px; border-radius: 4px; }}
 .changes {{ padding: 14px 20px; background: #f0f9ff; border: 1px solid #90cdf4; border-radius: 12px; font-size: 14px; }}
