@@ -55,7 +55,7 @@ def discovered_backup_paths():
         pass
 
     # Include mounted Proxmox storage roots.  This catches mounts such as
-    # /mnt/pve/HDD2 even when storage.cfg uses a different storage name.
+    # /mnt/pve/HDD2 or /mnt/hdd2 even when storage.cfg uses a different name.
     try:
         with open('/proc/mounts', encoding='utf-8', errors='replace') as mounts:
             for line in mounts:
@@ -67,6 +67,11 @@ def discovered_backup_paths():
                     paths.extend((os.path.join(mountpoint, 'dump'), mountpoint))
     except OSError:
         pass
+
+    # Fallback for common Proxmox directory storages that are mounted outside
+    # /mnt/pve or are exported with a storage name that does not match the path.
+    for fallback in ('/mnt/hdd2', '/mnt/hdd1', '/var/lib/vz'):
+        paths.extend((os.path.join(fallback, 'dump'), fallback))
 
     return paths
 
