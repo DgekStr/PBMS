@@ -28,7 +28,8 @@
 |---|---|
 | [`backup_monitor.sh`](backup_monitor.sh) | Оркестрация сбора, генерации единого отчёта и отправки email/Mattermost |
 | [`backup_monitor_collector.py`](backup_monitor_collector.py) | Сбор данных через `pvesh` и поиск backup-файлов |
-| [`backup_monitor_html.py`](backup_monitor_html.py) | Генерация HTML |
+| [`backup_monitor_diff.py`](backup_monitor_diff.py) | Сравнение текущего и предыдущего JSON |
+| [`backup_monitor_html.py`](backup_monitor_html.py) | Генерация HTML с подсветкой изменений |
 | [`backup_monitor_mattermost.py`](backup_monitor_mattermost.py) | Преобразование общего отчёта в Mattermost-сообщение через Incoming Webhook |
 | [`backup_monitor.conf.example`](backup_monitor.conf.example) | Публичный шаблон конфигурации PBMS |
 | [`msmtprc.example`](msmtprc.example) | Публичный шаблон конфигурации SMTP без учётных данных |
@@ -96,6 +97,8 @@ sudo ./install.sh
 - `PBMS_MAX_RUNTIME` — зарезервированная настройка общего лимита запуска;
 - `PBMS_DEBUG_FILE` — путь диагностического лога;
 - `PBMS_HOSTNAME` — подпись кластера в отчёте;
+- `PBMS_PREVIOUS_DATA_FILE` — защищённый baseline между запусками, по умолчанию `/var/lib/pbms/previous_backup_data.json`;
+- `PBMS_CHANGES_FILE` — временный JSON со списком изменений текущего запуска;
 - `PBMS_MATTERMOST_ENABLED` — включение уведомлений Mattermost (`true`/`false`);
 - `PBMS_MATTERMOST_WEBHOOK_URL` — Incoming Webhook URL, хранить только в локальном конфиге;
 - `PBMS_MATTERMOST_ONLY_ON_ERROR` — отправлять уведомление только при проблемах (`true`/`false`).
@@ -120,6 +123,12 @@ PBMS_MATTERMOST_ONLY_ON_ERROR="false"
 
 Webhook является секретом: не вставляйте его в README, example-файлы, issue или командную строку. Если URL уже был опубликован, после тестирования отзовите его в Mattermost и создайте новый.
 
+## Сравнение отчётов
+
+PBMS сохраняет последний успешно собранный JSON вне репозитория в `/var/lib/pbms/previous_backup_data.json`. При следующем запуске текущий результат сравнивается с baseline по ключу `нода + тип + ID`. Отслеживаются добавление и удаление VM/LXC, изменение состояния объекта, статуса, даты, размера, файла и хранилища backup.
+
+Первый запуск только создаёт baseline и показывает в отчёте, что предыдущий отчёт отсутствует. После сравнения изменения отображаются в HTML-письме подсвеченными строками и отдельным списком, а Mattermost получает список изменений и текстовое представление актуального отчёта. Путь baseline можно изменить переменной `PBMS_PREVIOUS_DATA_FILE`; state-файл не должен помещаться в Git.
+
 ## Логика проверки
 
 Для каждого VM/LXC PBMS выбирает самый новый файл с префиксом `vzdump-qemu-ID-` или `vzdump-lxc-ID-`. Если рядом существует `.log`, последние 20 000 символов проверяются по словам `error`, `failed`, `failure`, `critical` и `unable`. Результат имеет статус `OK`, `ERROR` или «Нет бэкапа».
@@ -143,7 +152,7 @@ cat /tmp/backup_report.html
 bash tests/test_mock.sh
 ```
 
-Тест проверяет генерацию HTML и наличие данных mock-объектов. Отправка почты в тестовом окружении намеренно может завершиться ошибкой, поскольку MTA не требуется для проверки сбора и генерации. При включённом Mattermost тот же HTML-отчёт отправляется в webhook; в mock-тесте внешняя отправка не выполняется.
+Тест проверяет генерацию HTML, baseline и наличие данных mock-объектов. Отправка почты в тестовом окружении намеренно может завершиться ошибкой, поскольку MTA не требуется для проверки сбора и генерации. Для email используется полный HTML-отчёт, а Mattermost получает список изменений и текстовое представление актуального отчёта.
 
 ## Безопасность перед публикацией
 
