@@ -87,11 +87,17 @@ def is_backup_file(filename, kind, vmid):
     return True
 
 def find_backup_for_node(kind, vmid, node):
-    """РџРѕРёСЃРє Р±СЌРєР°РїР° РўРћР›Р¬РљРћ РІ РїР°РїРєР°С… СѓРєР°Р·Р°РЅРЅРѕР№ РЅРѕРґС‹"""
+    """Find the newest backup across the node's default and alternate paths."""
     best = None
     best_mtime = 0
 
-    paths = NODE_BACKUP_PATHS.get(node, [])
+    # PBMS_BACKUP_DIR is the configured default path.  Include it explicitly
+    # because NODE_BACKUP_PATHS contains only built-in alternate paths and may
+    # not match a site's configuration.
+    paths = []
+    for path in [backup_dir, *NODE_BACKUP_PATHS.get(node, [])]:
+        if path and path not in paths:
+            paths.append(path)
 
     for path in paths:
         if not os.path.isdir(path):
