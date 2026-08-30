@@ -2,7 +2,9 @@
 import json,os,re,subprocess,sys
 from datetime import datetime
 
-out, backup_dir, nodes_arg, timeout_arg = sys.argv[1:]
+out, backup_dir, nodes_arg, timeout_arg = sys.argv[1:5]
+MIN_BACKUP_SIZE_MB = float(sys.argv[5]) if len(sys.argv) > 5 else 100.0
+MIN_BACKUP_SIZE_BYTES = MIN_BACKUP_SIZE_MB * 1024 * 1024
 PVESH_TIMEOUT = float(timeout_arg)
 errors = []
 objects = []
@@ -125,12 +127,20 @@ def find_backup_for_node(kind, vmid, node):
         except OSError:
             result = 'ERROR'
 
+    archive_size = os.path.getsize(best['fullpath'])
+    too_small = archive_size < MIN_BACKUP_SIZE_BYTES
+    if too_small:
+        result = 'TOO_SMALL'
+
     return {
         'date': datetime.fromtimestamp(best['mtime']).isoformat(timespec='seconds'),
-        'size': size(os.path.getsize(best['fullpath'])),
+        'size': size(archive_size),
+        'size_bytes': archive_size,
+        'min_size_mb': MIN_BACKUP_SIZE_MB,
         'status': result,
         'file': best['file'],
-        'path': best['path']
+        'path': best['path'],
+        'size_warning': too_small
     }
 
 for node in nodes:

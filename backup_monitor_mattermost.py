@@ -47,14 +47,15 @@ def current_report(data, hostname):
     running = sum(x.get("status") == "running" for x in objects)
     backups_ok = sum(bool(x.get("backup")) and x["backup"].get("status") == "OK" for x in objects)
     backups_error = sum(bool(x.get("backup")) and x["backup"].get("status") == "ERROR" for x in objects)
-    no_backup = len(objects) - backups_ok - backups_error
+    backups_small = sum(bool(x.get("backup")) and x["backup"].get("status") == "TOO_SMALL" for x in objects)
+    no_backup = len(objects) - backups_ok - backups_error - backups_small
     lines = [
         "**📊 Текущий отчёт**",
         f"{hostname} · {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M')}",
         "",
         "📈 **Статистика:**",
         f"• Всего объектов: {len(objects)} (запущено: {running})",
-        f"• Бэкапы: ✅ {backups_ok} OK · ❌ {backups_error} ошибок · ⚠️ {no_backup} нет бэкапа",
+        f"• Бэкапы: ✅ {backups_ok} OK · ❌ {backups_error} ошибок · 🔴 {backups_small} слишком мал · ⚠️ {no_backup} нет бэкапа",
         "",
         "| Нода | ID | Имя | Статус | Бэкап | Размер | Статус |",
         "|---|---:|---|---|---|---:|---|",
@@ -62,15 +63,19 @@ def current_report(data, hostname):
     for item in sorted(objects, key=lambda x: (x.get("node", ""), x.get("type", ""), str(x.get("id", "")))):
         backup = item.get("backup") or {}
         status = "🟢 running" if item.get("status") == "running" else "🔴 " + clean(item.get("status"), "unknown")
-        backup_status = "✅ OK" if backup.get("status") == "OK" else "❌ ERROR" if backup.get("status") == "ERROR" else "⚠️ Нет"
+        backup_status = "✅ OK" if backup.get("status") == "OK" else "❌ ERROR" if backup.get("status") == "ERROR" else "🔴 Слишком мал" if backup.get("status") == "TOO_SMALL" else "⚠️ Нет"
         cells = [
             clean(item.get("node")), clean(item.get("id")), clean(item.get("name")), status,
             format_date(backup.get("date")), clean(backup.get("size")), backup_status,
         ]
         # Escape Markdown table delimiters so object names cannot break the layout.
         lines.append("| " + " | ".join(value.replace("|", "\\|").replace("\n", " ") for value in cells) + " |")
-    if data.get("errors"):
-        lines.extend(["", "⚠️ **Ошибки сбора:**", *[f"• {error}" for error in data["errors"]]])
+    warnings = [
+        f"• ⚠️ Размер бэкапа на {item.get('type', 'VM')}{item.get('id', '')} слишком мал — {clean((item.get('backup') or {}).get('size'))}, менее {(item.get('backup') or {}).get('min_size_mb', 100):g} MB. Возможно повреждение, нужна проверка."
+        for item in objects if (item.get("backup") or {}).get("size_warning")
+    ]
+    if data.get("errors") or warnings:
+        lines.extend(["", "⚠️ **Проверки и ошибки:**", *[f"• {error}" for error in data.get("errors", [])], *warnings])
     return "\n".join(lines)
 
 

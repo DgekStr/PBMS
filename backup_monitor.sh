@@ -17,13 +17,14 @@ CONFIG_FILE="${PBMS_CONFIG:-/etc/backup_monitor.conf}"
 : "${PBMS_MATTERMOST_WEBHOOK_URL:=CHANGE_ME}"
 : "${PBMS_MATTERMOST_ONLY_ON_ERROR:=false}"
 : "${PBMS_PREVIOUS_DATA_FILE:=/var/lib/pbms/previous_backup_data.json}"
+: "${PBMS_MIN_BACKUP_SIZE_MB:=100}"
 
 DATA_FILE="${PBMS_DATA_FILE:-/tmp/backup_data.json}"
 REPORT_FILE="${PBMS_REPORT_FILE:-/tmp/backup_report.html}"
 CHANGES_FILE="${PBMS_CHANGES_FILE:-/tmp/backup_changes.json}"
 
 # Сбор данных
-/usr/local/bin/backup_monitor_collector.py "$DATA_FILE" "$PBMS_BACKUP_DIR" "$PBMS_NODES" "$PBMS_PVESH_TIMEOUT"
+/usr/local/bin/backup_monitor_collector.py "$DATA_FILE" "$PBMS_BACKUP_DIR" "$PBMS_NODES" "$PBMS_PVESH_TIMEOUT" "$PBMS_MIN_BACKUP_SIZE_MB"
 
 # Сравнение с предыдущим завершённым сбором
 /usr/local/bin/backup_monitor_diff.py "$PBMS_PREVIOUS_DATA_FILE" "$DATA_FILE" "$CHANGES_FILE"
@@ -52,7 +53,7 @@ encode_rfc2047(){
 
 # Отправка актуального отчёта и списка изменений в Mattermost.
 if [[ "$PBMS_MATTERMOST_ENABLED" == "true" ]]; then
-  if [[ "$PBMS_MATTERMOST_ONLY_ON_ERROR" != "true" || $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(bool(d.get("errors") or any(not x.get("backup") or x["backup"].get("status") == "ERROR" for x in d.get("objects", [])))' "$DATA_FILE") == "True" ]]; then
+  if [[ "$PBMS_MATTERMOST_ONLY_ON_ERROR" != "true" || $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(bool(d.get("errors") or any(not x.get("backup") or x["backup"].get("status") in ("ERROR", "TOO_SMALL") for x in d.get("objects", [])))' "$DATA_FILE") == "True" ]]; then
     /usr/local/bin/backup_monitor_mattermost.py "$DATA_FILE" "$REPORT_FILE" "$CHANGES_FILE" "$PBMS_MATTERMOST_WEBHOOK_URL" "$PBMS_HOSTNAME" || echo "⚠️ Mattermost notification failed" >&2
   fi
 fi

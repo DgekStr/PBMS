@@ -28,6 +28,8 @@ def bstatus(x):
     b = x.get("backup")
     if not b:
         return '<span class="warn">⚠️ Нет бэкапа</span>'
+    if b.get("status") == "TOO_SMALL":
+        return f'<span class="bad">⚠️ Слишком мал (менее {esc(str(b.get("min_size_mb", 100)).rstrip(".0"))} MB)</span>'
     return '<span class="bad">❌ Ошибка</span>' if b.get("status") == "ERROR" else '<span class="good">✅ OK</span>'
 
 
@@ -68,7 +70,7 @@ for x in sorted(items, key=lambda q: (q.get("node", ""), q.get("type", ""), str(
             <td><span class="type-badge">{esc(str(x.get("type", "")))}</span></td>
             {cell(f'<span class="{status_cls}">● {esc(str(x.get("status", "")))}</span>', key, "status")}
             {cell(esc(str(b.get("date", "—")).replace("T", " ")), key, "backup.date")}
-            {cell(esc(str(b.get("size", "—"))), key, "backup.size")}
+            {cell(('<span class="bad-size">' + esc(str(b.get("size", "—"))) + '</span>') if b.get("size_warning") else esc(str(b.get("size", "—"))), key, "backup.size")}
             {cell(esc(str(backup_path(x))), key, "backup.path")}
             {cell(bstatus(x), key, "backup.status")}
         </tr>
@@ -98,7 +100,14 @@ elif changes:
 else:
     changes_html = "<p>Изменений нет.</p>"
 
-err = "".join(f'<li>{esc(str(e))}</li>' for e in data.get("errors", [])) or "<li>Сбоев сбора нет</li>"
+size_warnings = [
+    f'Размер бэкапа на {esc(str(x.get("type", "VM")))}{esc(str(x.get("id", "")))} слишком мал '
+    f'( {esc(str((x.get("backup") or {}).get("size", "—")))}; менее {esc(str((x.get("backup") or {}).get("min_size_mb", 100)).rstrip(".0"))} MB), возможны повреждения. Нужна проверка!'
+    for x in items if (x.get("backup") or {}).get("size_warning")
+]
+err_items = [f'<li>{esc(str(e))}</li>' for e in data.get("errors", [])]
+err_items.extend(f'<li class="bad">⚠️ {warning}</li>' for warning in size_warnings)
+err = "".join(err_items) or "<li>Сбоев сбора нет</li>"
 dt = datetime.now().astimezone().strftime("%d.%m.%Y %H:%M")
 
 doc = f'''<!DOCTYPE html>
@@ -126,7 +135,7 @@ td {{ padding: 12px 16px; border-bottom: 1px solid #edf2f7; color: #2d3748; }}
 tr:hover td {{ background: #f7fafc; }}
 .changed-row td {{ background: #fff8e1; }} .added-row td {{ background: #e6ffed; }} .changed-cell {{ box-shadow: inset 0 -3px 0 #ed8936; }}
 .type-badge {{ display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #e2e8f0; }}
-.status-running,.good {{ color: #38a169; font-weight: 600; }} .status-stopped,.bad {{ color: #e53e3e; font-weight: 600; }} .warn {{ color: #dd6b20; font-weight: 600; }}
+.status-running,.good {{ color: #38a169; font-weight: 600; }} .status-stopped,.bad {{ color: #e53e3e; font-weight: 600; }} .warn {{ color: #dd6b20; font-weight: 600; }} .bad-size {{ color: #e53e3e; font-weight: 700; background: #fff5f5; padding: 2px 5px; border-radius: 4px; }}
 .changes {{ padding: 14px 20px; background: #f0f9ff; border: 1px solid #90cdf4; border-radius: 12px; font-size: 14px; }}
 .changes ul,.errors ul {{ padding-left: 20px; margin-top: 8px; }}
 .errors {{ margin-top: 20px; padding: 14px 20px; background: #fffbeb; border: 1px solid #f6c23e; border-radius: 12px; color: #7b341e; font-size: 14px; }}
