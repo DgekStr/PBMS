@@ -10,7 +10,7 @@ errors = []
 objects = []
 nodes = nodes_arg.split()
 
-# РџРђРџРљР РЎ Р‘Р­РљРђРџРђРњР Р”Р›РЇ РљРђР–Р”РћР™ РќРћР”Р« (РёР· СЃРєСЂРёРЅР°)
+# ПАПКИ С БЭКАПАМИ ДЛЯ КАЖДОЙ НОДЫ (из скрина)
 NODE_BACKUP_PATHS = {
     "pve": [
         "/mnt/pve/backup/dump",
@@ -27,16 +27,17 @@ NODE_BACKUP_PATHS = {
     ],
 }
 
-# Р Р°СЃС€РёСЂРµРЅРёСЏ С„Р°Р№Р»РѕРІ Р±СЌРєР°РїРѕРІ (РёСЃРєР»СЋС‡Р°РµРј .notes Рё .log)
+# Расширения файлов бэкапов (исключаем .notes и .log)
 BACKUP_EXTENSIONS = ['.vma', '.vma.zst', '.tar', '.tar.zst', '.gz', '.lzo']
 
 
 def discovered_backup_paths():
-    """Discover Proxmox directory-storage dump paths without storage names."""
+    """Находит каталоги дампов Proxmox-хранилищ типа directory без использования имён хранилищ."""
     paths = []
 
-    # A directory storage can be mounted at any path (for example
-    # /mnt/pve/HDD2), so storage IDs must not be used to construct paths.
+    # Каталог-хранилище может быть смонтирован в любой путь (например
+    # /mnt/pve/HDD2), поэтому идентификаторы хранилищ нельзя использовать
+    # для построения путей.
     try:
         in_dir_storage = False
         with open('/etc/pve/storage.cfg', encoding='utf-8', errors='replace') as storage_cfg:
@@ -54,8 +55,9 @@ def discovered_backup_paths():
     except OSError:
         pass
 
-    # Include mounted Proxmox storage roots.  This catches mounts such as
-    # /mnt/pve/HDD2 or /mnt/hdd2 even when storage.cfg uses a different name.
+    # Добавляем смонтированные корни Proxmox-хранилищ. Это позволяет поймать
+    # точки монтирования вида /mnt/pve/HDD2 или /mnt/hdd2, даже если в
+    # storage.cfg указано другое имя.
     try:
         with open('/proc/mounts', encoding='utf-8', errors='replace') as mounts:
             for line in mounts:
@@ -68,8 +70,8 @@ def discovered_backup_paths():
     except OSError:
         pass
 
-    # Fallback for common Proxmox directory storages that are mounted outside
-    # /mnt/pve or are exported with a storage name that does not match the path.
+    # Запасные пути для распространённых Proxmox-хранилищ, смонтированных вне
+    # /mnt/pve или экспортируемых с именем хранилища, не совпадающим с путём.
     for fallback in ('/mnt/hdd2', '/mnt/hdd1', '/var/lib/vz'):
         paths.extend((os.path.join(fallback, 'dump'), fallback))
 
@@ -119,25 +121,25 @@ def size(n):
     return f'{n:.1f}P'
 
 def is_backup_file(filename, kind, vmid):
-    """РџСЂРѕРІРµСЂСЏРµС‚, СЏРІР»СЏРµС‚СЃСЏ Р»Рё С„Р°Р№Р» РѕСЃРЅРѕРІРЅС‹Рј С„Р°Р№Р»РѕРј Р±СЌРєР°РїР° (РЅРµ .notes Рё РЅРµ .log)"""
+    """Проверяет, является ли файл основным файлом бэкапа (не .notes и не .log)"""
     if not filename.startswith(f'vzdump-{kind}-{vmid}-'):
         return False
     if filename.endswith('.notes') or filename.endswith('.log'):
         return False
-    # РџСЂРѕРІРµСЂСЏРµРј СЂР°СЃС€РёСЂРµРЅРёРµ
+    # Проверяем расширение
     for ext in BACKUP_EXTENSIONS:
         if filename.endswith(ext):
             return True
-    # Р•СЃР»Рё РЅРµС‚ РёР·РІРµСЃС‚РЅРѕРіРѕ СЂР°СЃС€РёСЂРµРЅРёСЏ, РЅРѕ С„Р°Р№Р» РЅРµ .notes/.log вЂ” СЃС‡РёС‚Р°РµРј Р±СЌРєР°РїРѕРј
+    # Если нет известного расширения, но файл не .notes/.log — считаем бэкапом
     return True
 
 def find_backup_for_node(kind, vmid, node):
-    """Find the newest backup across the node's default and alternate paths."""
+    """Находит самый новый бэкап среди стандартных и дополнительных путей ноды."""
     best = None
     best_mtime = 0
 
-    # PBMS_BACKUP_DIR and built-in paths remain supported, while Proxmox
-    # storage/mount discovery makes the search independent of storage names.
+    # PBMS_BACKUP_DIR и встроенные пути по-прежнему поддерживаются, а поиск
+    # хранилищ и точек монтирования Proxmox делает поиск независимым от имён хранилищ.
     paths = []
     for path in [backup_dir, *NODE_BACKUP_PATHS.get(node, []), *discovered_backup_paths()]:
         if path and path not in paths:

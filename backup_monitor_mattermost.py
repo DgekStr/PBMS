@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send a compact, readable PBMS report and change list to Mattermost."""
+"""Отправляет компактный читаемый отчёт PBMS и список изменений в Mattermost."""
 import json
 import sys
 import urllib.error
@@ -68,7 +68,7 @@ def current_report(data, hostname):
             clean(item.get("node")), clean(item.get("id")), clean(item.get("name")), status,
             format_date(backup.get("date")), clean(backup.get("size")), backup_status,
         ]
-        # Escape Markdown table delimiters so object names cannot break the layout.
+        # Экранируем разделители Markdown-таблицы, чтобы имена объектов не ломали разметку.
         lines.append("| " + " | ".join(value.replace("|", "\\|").replace("\n", " ") for value in cells) + " |")
     warnings = [
         f"• ⚠️ Размер бэкапа на {item.get('type', 'VM')}{item.get('id', '')} слишком мал — {clean((item.get('backup') or {}).get('size'))}, менее {(item.get('backup') or {}).get('min_size_mb', 100):g} MB. Возможно повреждение, нужна проверка."

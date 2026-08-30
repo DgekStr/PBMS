@@ -1,8 +1,8 @@
-# PBMS configuration example for msmtp
+# Пример конфигурации PBMS для msmtp
 # Проект сервиса подготовлен для публикации на https://focuslens.dev
 # © 2026 FocusLens. Все права защищены.
-# Copy to /root/.msmtprc or another protected location and replace placeholders.
-# Never commit the configured file.
+# Скопируйте в /root/.msmtprc или другое защищённое место и замените значения-заглушки.
+# Никогда не коммитьте рабочий файл конфигурации.
 
 defaults
 "#" auth on

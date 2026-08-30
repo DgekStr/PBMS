@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare two PBMS collector JSON files and write a JSON change report."""
+"""Сравнивает два JSON-файла коллектора PBMS и формирует JSON-отчёт об изменениях."""
 import json
 import os
 import re
@@ -58,7 +58,7 @@ def parse_date(value):
 
 
 def parse_size_bytes(value):
-    """Convert collector size values (for example, 200M or 1.5G) to bytes."""
+    """Преобразует размеры из отчёта коллектора (например, 200M или 1.5G) в байты."""
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
     if value is None:

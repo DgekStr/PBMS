@@ -1,5 +1,5 @@
 #!/bin/bash
-# PBMS - Proxmox Backup Monitoring System
+# PBMS — система мониторинга бэкапов Proxmox
 # Сбор данных, генерация HTML и отправка на почту
 
 # Конфигурация

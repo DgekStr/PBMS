@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the collector chooses the newest archive across configured paths."""
+"""Проверяет, что коллектор выбирает самый новый архив среди настроенных путей."""
 import os
 import sys
 import tempfile

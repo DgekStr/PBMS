@@ -10,7 +10,7 @@ cp "$ROOT/tests/mock-bin/pvesh" "$TMP/bin/pvesh"
 chmod +x "$TMP/bin/pvesh" "$ROOT/backup_monitor.sh"
 printf 'backup\n' > "$TMP/backup/vzdump-qemu-101-2026_08_28-01_00_00.vma.zst"
 printf 'INFO: backup finished successfully\n' > "$TMP/backup/vzdump-qemu-101-2026_08_28-01_00_00.vma.zst.log"
-# The mock archive is intentionally below the default 100 MB threshold.
+# Тестовый архив намеренно меньше порога по умолчанию в 100 МБ.
 PATH="$TMP/bin:$PATH" PBMS_CONFIG=/dev/null PBMS_NODES='pve' PBMS_BACKUP_DIR="$TMP/backup" PBMS_DATA_FILE="$TMP/data.json" PBMS_REPORT_FILE="$TMP/report.html" PBMS_CHANGES_FILE="$TMP/changes.json" PBMS_PREVIOUS_DATA_FILE="$TMP/previous.json" PBMS_MIN_BACKUP_SIZE_MB=100 PBMS_LOG_FILE="$TMP/report.log" PBMS_RECIPIENT=test@example.invalid PBMS_HOSTNAME='Test cluster' \
   "$ROOT/backup_monitor.sh" >/dev/null 2>&1 || { echo 'Expected mail command is unavailable; collection/generation was attempted.'; }
 test -s "$TMP/report.html" || { echo 'HTML report was not generated'; exit 1; }

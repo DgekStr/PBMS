@@ -1,7 +1,7 @@
-# PBMS configuration example. Replace every value marked CHANGE_ME.
+# Пример конфигурации PBMS. Замените все значения CHANGE_ME.
 PBMS_NODES="pve pve2 pve3"
 PBMS_BACKUP_DIR="/mnt/pve/backup/dump"
-# Persistent baseline and per-run change report
+# Постоянный baseline и отчёт об изменениях за запуск
 PBMS_PREVIOUS_DATA_FILE="/var/lib/pbms/previous_backup_data.json"
 PBMS_CHANGES_FILE="/tmp/backup_changes.json"
 PBMS_RECIPIENT="CHANGE_ME@example.com"
@@ -13,7 +13,7 @@ PBMS_MAX_RUNTIME="30"
 PBMS_DEBUG_FILE="/var/log/backup_monitor_debug.log"
 PBMS_HOSTNAME="Proxmox cluster"
 
-# Mattermost Incoming Webhook. Store the real URL only in /etc/backup_monitor.conf.
+# Входящий Webhook Mattermost. Настоящий URL храните только в /etc/backup_monitor.conf.
 PBMS_MATTERMOST_ENABLED="true"
 PBMS_MATTERMOST_WEBHOOK_URL="CHANGE_ME"
 PBMS_MATTERMOST_ONLY_ON_ERROR="false"
