@@ -38,7 +38,7 @@ def backup_path(x):
 
 
 def card(a, b, c):
-    return f'<div class="card"><div class="card-label">{a}</div><div class="card-value">{b}</div><div class="card-sub">{c}</div></div>'
+    return f'<div class="card"><span class="card-label">{a}</span><span class="card-value">{b}</span><span class="card-sub">{c}</span></div>'
 
 
 changes = diff.get("changes", [])
@@ -126,10 +126,10 @@ body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #f5f7fa; color: 
 h1 {{ font-size: 26px; margin-bottom: 4px; }}
 .subtitle {{ color: #718096; font-size: 15px; margin-bottom: 24px; }}
 .stats {{ display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 16px; margin-bottom: 28px; }}
-.card {{ background: #f7fafc; padding: 16px 20px; border-radius: 12px; border-left: 4px solid #4299e1; }}
-.card-label {{ font-size: 12px; text-transform: uppercase; color: #718096; font-weight: 600; }}
-.card-value {{ font-size: 30px; font-weight: 700; color: #2d3748; margin: 4px 0 2px; }}
-.card-sub {{ font-size: 13px; color: #a0aec0; }}
+.card {{ display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 10px; background: #f7fafc; padding: 14px 20px; border-radius: 12px; border-left: 4px solid #4299e1; }}
+.card-label {{ font-size: 12px; text-transform: uppercase; color: #718096; font-weight: 600; white-space: nowrap; }}
+.card-value {{ font-size: 26px; font-weight: 700; color: #2d3748; white-space: nowrap; }}
+.card-sub {{ font-size: 13px; color: #a0aec0; white-space: nowrap; }}
 h2 {{ font-size: 18px; color: #2d3748; margin: 28px 0 14px; }}
 .table-wrap {{ overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; }}
 table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
